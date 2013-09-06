@@ -14,13 +14,14 @@
 # limitations under the License.
 
 from climate.openstack.common import log as logging
-from climate.service import api
+from climate.service import api as service_api
 from climate.service import validation
 import climate.utils.api as api_utils
 
 LOG = logging.getLogger(__name__)
 
 rest = api_utils.Rest('v10', __name__)
+api = service_api.API()
 
 
 ## Leases operations
@@ -38,21 +39,21 @@ def leases_create(data):
 
 
 @rest.get('/leases/<lease_id>')
-@validation.check_exists(api.get_lease, 'lease_id')
+@validation.check_exists(api.get_lease, lease_id='lease_id')
 def leases_get(lease_id):
     """Get lease by its ID."""
     return api_utils.render(lease=api.get_lease(lease_id))
 
 
 @rest.put('/leases/<lease_id>')
-@validation.check_exists(api.get_lease, 'lease_id')
+@validation.check_exists(api.get_lease, lease_id='lease_id')
 def leases_update(lease_id, data):
     """Update lease. Only name changing and prolonging may be proceeded."""
     return api_utils.render(lease=api.update_lease(lease_id, data))
 
 
 @rest.delete('/leases/<lease_id>')
-@validation.check_exists(api.get_lease, 'lease_id')
+@validation.check_exists(api.get_lease, lease_id='lease_id')
 def leases_delete(lease_id):
     """Delete specified lease."""
     api.delete_lease(lease_id)

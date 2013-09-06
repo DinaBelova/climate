@@ -13,59 +13,74 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from climate import context
+from climate import exceptions
+from climate.manager import rpcapi as manager_rpcapi
 from climate.openstack.common import log as logging
 
 
 LOG = logging.getLogger(__name__)
 
 
-## Leases operations
+class API(object):
+    def __init__(self):
+        self.manager_rpcapi = manager_rpcapi.ManagerRPCAPI()
 
-def get_leases():
-    """List all existing leases."""
-    pass
+    def get_leases(self):
+        """List all existing leases."""
+        return self.manager_rpcapi.list_leases(context.ctx())
 
+    def create_lease(self, data):
+        """Create new lease.
 
-def create_lease(data):
-    """Create new lease.
+        :param data: New lease characteristics.
+        :type data: dict
+        """
+        # here API should go to Keystone API v3 and create trust
+        trust = 'trust'
+        data.update({'trust': trust})
 
-    :param data: New lease characteristics.
-    :type data: dict
-    """
-    pass
+        return self.manager_rpcapi.create_lease(context.ctx(),
+                                                data)
 
+    def get_lease(self, lease_id):
+        """Get lease by its ID.
 
-def get_lease(lease_id):
-    """Get lease by its ID.
+        :param lease_id: ID of the lease in Climate DB.
+        :type lease_id: str
+        """
+        return self.manager_rpcapi.get_lease(context.ctx(), lease_id)
 
-    :param lease_id: ID of the lease in Climate DB.
-    :type lease_id: str
-    """
-    pass
+    def update_lease(self, lease_id, data):
+        """Update lease. Only name changing and prolonging may be proceeded.
 
+        :param lease_id: ID of the lease in Climate DB.
+        :type lease_id: str
+        :param data: New lease characteristics.
+        :type data: dict
+        """
+        new_name = data.pop('name', None)
+        prolong = data.pop('prolong_for', None)
+        if len(data) > 0:
+            raise exceptions.ClimateException('Only name changing and '
+                                              'prolonging may be proceeded.')
+        data = {}
+        if new_name:
+            data['name'] = new_name
+        if prolong:
+            data['prolong_for'] = prolong
+        return self.manager_rpcapi.update_lease(context.ctx(),
+                                                lease_id,
+                                                data)
 
-def update_lease(lease_id, data):
-    """Update lease. Only name changing and prolonging may be proceeded.
+    def delete_lease(self, lease_id):
+        """Delete specified lease.
 
-    :param lease_id: ID of the lease in Climate DB.
-    :type lease_id: str
-    :param data: New lease characteristics.
-    :type data: dict
-    """
-    pass
+        :param lease_id: ID of the lease in Climate DB.
+        :type lease_id: str
+        """
+        self.manager_rpcapi.delete_lease(context.ctx(), lease_id)
 
-
-def delete_lease(lease_id):
-    """Delete specified lease.
-
-    :param lease_id: ID of the lease in Climate DB.
-    :type lease_id: str
-    """
-    pass
-
-
-## Plugins operations
-
-def get_plugins():
-    """List all possible plugins."""
-    pass
+    def get_plugins(self):
+        """List all possible plugins."""
+        pass

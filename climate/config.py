@@ -25,11 +25,56 @@ cli_opts = [
                'an AMQP key, and if using ZeroMQ, a valid '
                'hostname, FQDN, or IP address'),
     cfg.IntOpt('port', default=1234,
-               help='Port that will be used to listen on')
+               help='Port that will be used to listen on'),
+    cfg.BoolOpt('log-exchange', default=False,
+                help='Log request/response exchange details: environ, '
+                     'headers and bodies')
+]
+
+manager_opts = [
+    cfg.StrOpt('manager_rpc_topic',
+               default='climate.manager',
+               help='The topic Climate uses for climate-manager messages.'),
+    cfg.ListOpt('additional_methods',
+                default=[],
+                help='All methods to expose in RPC Manager service.'),
+    cfg.ListOpt('plugins',
+                default=['dummy.vm.plugin'],
+                help='All plugins to use (one for every resource type to '
+                     'support.)')
+]
+
+os_opts = [
+    cfg.StrOpt('os_auth_protocol',
+               default='http',
+               help='Protocol used to access OpenStack Identity service'),
+    cfg.StrOpt('os_auth_host',
+               default='127.0.0.1',
+               help='IP or hostname of machine on which OpenStack Identity '
+                    'service is located'),
+    cfg.StrOpt('os_auth_port',
+               default='35357',
+               help='Port of OpenStack Identity service'),
+    cfg.StrOpt('os_admin_username',
+               default='admin',
+               help='This OpenStack user is used to verify provided tokens. '
+                    'The user must have admin role in <os_admin_tenant_name> '
+                    'tenant'),
+    cfg.StrOpt('os_admin_password',
+               default='nova',
+               help='Password of the admin user'),
+    cfg.StrOpt('os_admin_tenant_name',
+               default='admin',
+               help='Name of tenant where the user is admin'),
+    cfg.StrOpt('os_auth_version',
+               default='v3.0',
+               help='We use API v3 to allow trusts using.'),
 ]
 
 CONF = cfg.CONF
 CONF.register_cli_opts(cli_opts)
+CONF.register_cli_opts(manager_opts)
+CONF.register_cli_opts(os_opts)
 
 ARGV = []
 
