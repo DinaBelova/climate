@@ -17,7 +17,7 @@ from climate import context
 from climate import exceptions
 from climate.manager import rpcapi as manager_rpcapi
 from climate.openstack.common import log as logging
-
+from climate.service import trusts
 
 LOG = logging.getLogger(__name__)
 
@@ -36,12 +36,11 @@ class API(object):
         :param data: New lease characteristics.
         :type data: dict
         """
-        # here API should go to Keystone API v3 and create trust
-        trust = 'trust'
-        data.update({'trust': trust})
+        trust = trusts.create_trust()
+        trust_id = trust.id
+        data.update({'trust_id': trust_id})
 
-        return self.manager_rpcapi.create_lease(context.ctx(),
-                                                data)
+        return self.manager_rpcapi.create_lease(context.ctx(), data)
 
     def get_lease(self, lease_id):
         """Get lease by its ID.

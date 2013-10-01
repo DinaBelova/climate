@@ -24,6 +24,7 @@ from climate.db import api as db_api
 from climate import exceptions
 from climate.openstack.common import log as logging
 from climate.openstack.common.rpc import service as rpc_service
+from climate.utils.openstack import keystone
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
@@ -236,6 +237,7 @@ class ManagerService(rpc_service.Service):
 
     def delete_lease(self, ctx, lease_id):
         lease = self.get_lease(ctx, lease_id)
+        keystone.create_ctx_from_trust(lease['trust_id'])
         for reservation in lease['reservations']:
             self.plugins[reservation['resource_type']]\
                 .delete(reservation['resource_id'], context.current())
@@ -250,6 +252,7 @@ class ManagerService(rpc_service.Service):
     def _basic_action(self, lease_id, action_time, reservation_status=None):
         """Commits basic lease actions such as starting and ending."""
         lease = self.get_lease(self.internal_context, lease_id)
+        keystone.create_ctx_from_trust(lease['trust_id'])
 
         for reservation in lease['reservations']:
             resource_type = reservation['resource_type']
