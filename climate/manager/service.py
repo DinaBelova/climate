@@ -166,17 +166,24 @@ class ManagerService(rpc_service.Service):
 
         event = events[0]
 
-        #todo compare time from DB and current time correctly
-        if event['time'] < datetime.datetime.now():
+        if event['time'] < datetime.datetime.utcnow():
+            db_api.event_update(self.internal_context,
+                                event['id'], {'status': 'IN_PROGRESS'})
             event_type = event['event_type']
             event_fn = getattr(self, event_type, None)
             if event_fn is None:
                 raise exceptions.ClimateException('Event type %s is not '
                                                   'supported' % event_type)
-            event_fn(self, event['lease_id'])
+            try:
+                event_fn(event['lease_id'])
+            except Exception:
+                db_api.event_update(self.internal_context,
+                                    event['id'], {'status': 'ERROR'})
+                LOG.exception('Error occurred while event handling.')
 
-        db_api.event_update(self.internal_context,
-                            event['id'], {'status': 'DONE'})
+            if event_type != 'end_lease':
+                db_api.event_update(self.internal_context,
+                                    event['id'], {'status': 'DONE'})
 
     def get_lease(self, ctx, lease_id):
         return db_api.lease_get(ctx, lease_id)
@@ -189,7 +196,7 @@ class ManagerService(rpc_service.Service):
         end_date = lease_values['end_date']
 
         if start_date == 'now':
-            start_date = datetime.datetime.now()
+            start_date = datetime.datetime.utcnow()
         else:
             start_date = datetime.datetime.strptime(start_date,
                                                     "%Y-%m-%d %H:%M")
@@ -202,11 +209,13 @@ class ManagerService(rpc_service.Service):
 
         db_api.event_create(ctx, {'lease_id': lease['id'],
                                   'event_type': 'start_lease',
-                                  'time': lease['start_date']})
+                                  'time': lease['start_date'],
+                                  'status': 'UNDONE'})
 
         db_api.event_create(ctx, {'lease_id': lease['id'],
                                   'event_type': 'end_lease',
-                                  'time': lease['end_date']})
+                                  'time': lease['end_date'],
+                                  'status': 'UNDONE'})
 
         return db_api.lease_get(ctx, lease['id'])
 

@@ -56,7 +56,21 @@ class Lease(mb.ClimateBase):
     def to_dict(self):
         d = super(Lease, self).to_dict()
         d['reservations'] = [r.to_dict() for r in self.reservations]
-        d['events'] = [e.to_dict() for e in self.events]
+        status = 'UNDONE'
+        all_done = True
+        d['events'] = []
+        for e in self.events:
+            e_dict = e.to_dict()
+            d['events'].append(e_dict)
+            if e_dict['status'] != 'DONE':
+                all_done = False
+            if e_dict['status'] == 'DONE':
+                status = 'IN_PROGRESS'
+
+        if all_done:
+            status = 'DONE'
+
+        d['status'] = status
         return d
 
 

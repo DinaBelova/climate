@@ -237,7 +237,8 @@ def lease_create(context, values):
 
             for e in events:
                 event = models.Event()
-                event.update({"lease_id": lease.id})
+                event.update({"lease_id": lease.id,
+                              "status": 'UNDONE'})
                 event.update(e)
                 event.save(session=session)
 
