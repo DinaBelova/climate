@@ -49,6 +49,7 @@ class ManagerService(rpc_service.Service):
         self.internal_context = context.Context(None, None, None, None)
         self.resource_actions = self._setup_actions()
         self._setup_methods()
+        self._setup_notifications()
 
     def start(self):
         super(ManagerService, self).start()
@@ -147,6 +148,13 @@ class ManagerService(rpc_service.Service):
                     'Invalid additional method format: %s' % parameter
                 )
 
+    def _setup_notifications(self):
+        notification_manager = extension.ExtensionManager(
+            namespace='climate.notification.plugins',
+            invoke_on_load=True
+        )
+        self.notifier = notification_manager.extensions[0].obj
+
     def _event(self):
         """Tries to commit event.
 
@@ -158,7 +166,7 @@ class ManagerService(rpc_service.Service):
             self.internal_context,
             sort_key='time',
             sort_dir='asc',
-            filters={'status': 'UNDONE'}
+            filters={'status': ['UNDONE']}
         )
 
         if not events:
@@ -175,15 +183,14 @@ class ManagerService(rpc_service.Service):
                 raise exceptions.ClimateException('Event type %s is not '
                                                   'supported' % event_type)
             try:
-                event_fn(event['lease_id'])
+                event_fn(event['lease_id'], event['time'])
             except Exception:
                 db_api.event_update(self.internal_context,
                                     event['id'], {'status': 'ERROR'})
                 LOG.exception('Error occurred while event handling.')
 
-            if event_type != 'end_lease':
-                db_api.event_update(self.internal_context,
-                                    event['id'], {'status': 'DONE'})
+            db_api.event_update(self.internal_context,
+                                event['id'], {'status': 'DONE'})
 
     def get_lease(self, ctx, lease_id):
         return db_api.lease_get(ctx, lease_id)
@@ -217,6 +224,32 @@ class ManagerService(rpc_service.Service):
                                   'time': lease['end_date'],
                                   'status': 'UNDONE'})
 
+        for notification_time in CONF.notifications:
+
+            if notification_time.endswith('m'):
+                time_unit = 'minutes'
+            elif notification_time.endswith('h'):
+                time_unit = 'hours'
+            elif notification_time.endswith('d'):
+                time_unit = 'days'
+            else:
+                raise exceptions.ClimateException('Invalid time unit for '
+                                                  'notifications.')
+
+            time_delta = datetime.timedelta(
+                **{time_unit: int(notification_time[1:-1])}
+            )
+
+            if notification_time.startswith('+'):
+                event_time = lease['start_date'] + time_delta
+            else:
+                event_time = lease['end_date'] - time_delta
+
+            db_api.event_create(ctx, {'lease_id': lease['id'],
+                                      'event_type': 'notify',
+                                      'time': event_time,
+                                      'status': 'UNDONE'})
+
         return db_api.lease_get(ctx, lease['id'])
 
     def update_lease(self, ctx, lease_id, values):
@@ -224,21 +257,25 @@ class ManagerService(rpc_service.Service):
         # flags to set days, hours, etc.
         prolong_for = values.pop('prolong_for', None)
         if prolong_for:
-            lease_event = db_api.event_get_all_sorted_by_filters(
+            lease_events = db_api.event_get_all_sorted_by_filters(
                 ctx,
                 sort_key='time',
                 sort_dir='asc',
-                filters={'lease_id': lease_id, 'event_type': 'end_lease'}
-            )[0]
+                filters={'lease_id': lease_id, 'event_type': ['end_lease',
+                                                              'notify']}
+            )
 
             end_date = self.get_lease(ctx, lease_id)['end_date']
             prolong_delta = datetime.timedelta(seconds=int(prolong_for))
             new_end_time = end_date + prolong_delta
             values['end_date'] = new_end_time
 
-            db_api.event_update(ctx,
-                                lease_event['id'],
-                                {'time': new_end_time})
+            for event in lease_events:
+                event_date = event['time']
+                new_event_time = event_date + prolong_delta
+
+                db_api.event_update(ctx, event['id'],
+                                    {'time': new_event_time})
 
         if values:
             db_api.lease_update(ctx, lease_id, values)
@@ -252,11 +289,19 @@ class ManagerService(rpc_service.Service):
                 .delete(reservation['resource_id'], context.current())
         db_api.lease_destroy(ctx, lease_id)
 
-    def start_lease(self, lease_id):
+    def start_lease(self, lease_id, event_time):
         self._basic_action(lease_id, 'on_start', 'active')
 
-    def end_lease(self, lease_id):
+    def end_lease(self, lease_id, event_time):
         self._basic_action(lease_id, 'on_end', 'deleted')
+
+    def notify(self, lease_id, event_time):
+        lease = self.get_lease(self.internal_context, lease_id)
+        self.notifier.notify(CONF.notify_to, 'Climate Notification',
+                             'Lease %s with id %s expires in %s.' %
+                             (lease['name'],
+                              lease_id,
+                              lease['end_date'] - event_time))
 
     def _basic_action(self, lease_id, action_time, reservation_status=None):
         """Commits basic lease actions such as starting and ending."""

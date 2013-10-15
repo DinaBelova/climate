@@ -9,6 +9,8 @@ os_admin_tenant_name=<tenant_name>
 
 plugins=dummy.vm.plugin
 
+notifications=-5m
+
 [virtual:instance]
 on_start = wake_up
 on_end = delete

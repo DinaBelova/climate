@@ -71,10 +71,35 @@ os_opts = [
                help='We use API v3 to allow trusts using.'),
 ]
 
+notification_opts = [
+    cfg.StrOpt('notify_to',
+               default='',
+               help='Defines user to send notification to.'),
+    cfg.ListOpt('notifications',
+                default=[],
+                help='Times for the notifications to '
+                     'appear.')
+]
+
+email_opts = [
+    cfg.StrOpt('mail_user',
+               default='climate.no.reply@gmail.com',
+               help='Email user to send notifications from.'),
+    cfg.StrOpt('mail_user_password',
+               default='climatenoreply',
+               help='Password for user to send notifications from.'),
+    cfg.StrOpt('mail_server',
+               default='smtp.gmail.com',
+               help='SMTP server to use.')
+]
+
+
 CONF = cfg.CONF
 CONF.register_cli_opts(cli_opts)
 CONF.register_cli_opts(manager_opts)
 CONF.register_cli_opts(os_opts)
+CONF.register_cli_opts(notification_opts)
+CONF.register_cli_opts(email_opts)
 
 ARGV = []
 
